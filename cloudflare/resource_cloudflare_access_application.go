@@ -40,7 +40,6 @@ func resourceCloudflareAccessApplicationCreate(ctx context.Context, d *schema.Re
 		EnableBindingCookie:     d.Get("enable_binding_cookie").(bool),
 		CustomDenyMessage:       d.Get("custom_deny_message").(string),
 		CustomDenyURL:           d.Get("custom_deny_url").(string),
-		HttpOnlyCookieAttribute: d.Get("http_only_cookie_attribute").(bool),
 		SameSiteCookieAttribute: d.Get("same_site_cookie_attribute").(string),
 		LogoURL:                 d.Get("logo_url").(string),
 		SkipInterstitial:        d.Get("skip_interstitial").(bool),
@@ -49,7 +48,8 @@ func resourceCloudflareAccessApplicationCreate(ctx context.Context, d *schema.Re
 	}
 
 	if value, ok := d.GetOk("http_only_cookie_attribute"); ok {
-		newAccessApplication.HttpOnlyCookieAttribute = value.(bool)
+		val := value.(bool)
+		newAccessApplication.HttpOnlyCookieAttribute = &val
 	}
 
 	if len(allowedIDPList) > 0 {
@@ -151,12 +151,16 @@ func resourceCloudflareAccessApplicationUpdate(ctx context.Context, d *schema.Re
 		EnableBindingCookie:     d.Get("enable_binding_cookie").(bool),
 		CustomDenyMessage:       d.Get("custom_deny_message").(string),
 		CustomDenyURL:           d.Get("custom_deny_url").(string),
-		HttpOnlyCookieAttribute: d.Get("http_only_cookie_attribute").(bool),
 		SameSiteCookieAttribute: d.Get("same_site_cookie_attribute").(string),
 		LogoURL:                 d.Get("logo_url").(string),
 		SkipInterstitial:        d.Get("skip_interstitial").(bool),
 		AppLauncherVisible:      d.Get("app_launcher_visible").(bool),
 		ServiceAuth401Redirect:  d.Get("service_auth_401_redirect").(bool),
+	}
+
+	if value, ok := d.GetOk("http_only_cookie_attribute"); ok {
+		val := value.(bool)
+		updatedAccessApplication.HttpOnlyCookieAttribute = &val
 	}
 
 	if len(allowedIDPList) > 0 {
