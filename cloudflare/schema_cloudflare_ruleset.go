@@ -73,7 +73,7 @@ func resourceCloudflareRulesetSchema() map[string]*schema.Schema {
 					},
 					"description": {
 						Type:     schema.TypeString,
-						Required: true,
+						Optional: true,
 					},
 					"action_parameters": {
 						Type:     schema.TypeList,
@@ -278,6 +278,47 @@ func resourceCloudflareRulesetSchema() map[string]*schema.Schema {
 										},
 									},
 								},
+								"response": {
+									Type:     schema.TypeList,
+									Optional: true,
+									Elem: &schema.Resource{
+										Schema: map[string]*schema.Schema{
+											"status_code": {
+												Type:     schema.TypeInt,
+												Optional: true,
+											},
+											"content_type": {
+												Type:     schema.TypeString,
+												Optional: true,
+											},
+											"content": {
+												Type:     schema.TypeString,
+												Optional: true,
+											},
+										},
+									},
+								},
+								"host_header": {
+									Type:     schema.TypeString,
+									Optional: true,
+								},
+								"origin": {
+									Type:     schema.TypeList,
+									Optional: true,
+									MaxItems: 1,
+									Elem: &schema.Resource{
+										Schema: map[string]*schema.Schema{
+											"host": {
+												Type:     schema.TypeString,
+												Optional: true,
+											},
+											"port": {
+												Type:     schema.TypeInt,
+												Optional: true,
+											},
+										},
+									},
+								},
 							},
 						},
 					},
@@ -306,8 +347,12 @@ func resourceCloudflareRulesetSchema() map[string]*schema.Schema {
 									Type:     schema.TypeInt,
 									Optional: true,
 								},
-								"mitigation_expression": {
+								"counting_expression": {
 									Type:     schema.TypeString,
+									Optional: true,
+								},
+								"requests_to_origin": {
+									Type:     schema.TypeBool,
 									Optional: true,
 								},
 							},
@@ -325,6 +370,19 @@ func resourceCloudflareRulesetSchema() map[string]*schema.Schema {
 								},
 								"password_expression": {
 									Type:     schema.TypeString,
+									Optional: true,
+								},
+							},
+						},
+					},
+					"logging": {
+						Type:     schema.TypeList,
+						Optional: true,
+						MaxItems: 1,
+						Elem: &schema.Resource{
+							Schema: map[string]*schema.Schema{
+								"enabled": {
+									Type:     schema.TypeBool,
 									Optional: true,
 								},
 							},

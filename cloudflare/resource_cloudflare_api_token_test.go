@@ -8,7 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
 
-func TestAccCloudflareAPIToken(t *testing.T) {
+func TestAccAPIToken_Basic(t *testing.T) {
 	// Temporarily unset CLOUDFLARE_API_TOKEN if it is set as the API token
 	// endpoint does not yet support the API tokens without an explicit scope.
 	if os.Getenv("CLOUDFLARE_API_TOKEN") != "" {
@@ -42,33 +42,7 @@ func TestAccCloudflareAPIToken(t *testing.T) {
 	})
 }
 
-func TestAccCloudflareAPITokenReorderedPermissionsGroups(t *testing.T) {
-	// Temporarily unset CLOUDFLARE_API_TOKEN if it is set as the API token
-	// endpoint does not yet support the API tokens without an explicit scope.
-	if os.Getenv("CLOUDFLARE_API_TOKEN") != "" {
-		defer func(apiToken string) {
-			os.Setenv("CLOUDFLARE_API_TOKEN", apiToken)
-		}(os.Getenv("CLOUDFLARE_API_TOKEN"))
-		os.Setenv("CLOUDFLARE_API_TOKEN", "")
-	}
-
-	rnd := generateRandomResourceName()
-
-	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
-		Steps: []resource.TestStep{
-			{
-				Config: testAccCloudflareAPITokenMultiplePermissionsGroups(rnd),
-			},
-			{
-				Config: testAccCloudflareAPITokenMultiplePermissionsGroupsReordered(rnd),
-			},
-		},
-	})
-}
-
-func TestAccCloudflareAPITokenAllowDeny(t *testing.T) {
+func TestAccAPIToken_AllowDeny(t *testing.T) {
 	// Temporarily unset CLOUDFLARE_API_TOKEN if it is set as the API token
 	// endpoint does not yet support the API tokens without an explicit scope.
 	if os.Getenv("CLOUDFLARE_API_TOKEN") != "" {
@@ -87,19 +61,19 @@ func TestAccCloudflareAPITokenAllowDeny(t *testing.T) {
 		Providers: testAccProviders,
 		Steps: []resource.TestStep{
 			{
-				Config: testAPITokenConfigAllowDeny(rnd, rnd, permissionID, zoneID, false),
+				Config: testAPITokenConfigAllowDeny(rnd, permissionID, zoneID, false),
 			},
 			{
-				Config: testAPITokenConfigAllowDeny(rnd, rnd, permissionID, zoneID, true),
+				Config: testAPITokenConfigAllowDeny(rnd, permissionID, zoneID, true),
 			},
 			{
-				Config: testAPITokenConfigAllowDeny(rnd, rnd, permissionID, zoneID, false),
+				Config: testAPITokenConfigAllowDeny(rnd, permissionID, zoneID, false),
 			},
 		},
 	})
 }
 
-func TestAccCloudflareAPITokenDoesNotSetConditions(t *testing.T) {
+func TestAccAPIToken_DoesNotSetConditions(t *testing.T) {
 	// Temporarily unset CLOUDFLARE_API_TOKEN if it is set as the API token
 	// endpoint does not yet support the API tokens without an explicit scope.
 	if os.Getenv("CLOUDFLARE_API_TOKEN") != "" {
@@ -143,7 +117,7 @@ func testAccCloudflareAPITokenWithoutCondition(resourceName, rnd, permissionID s
 `, resourceName, rnd, permissionID)
 }
 
-func TestAccCloudflareAPITokenSetIndividualCondition(t *testing.T) {
+func TestAccAPIToken_SetIndividualCondition(t *testing.T) {
 	// Temporarily unset CLOUDFLARE_API_TOKEN if it is set as the API token
 	// endpoint does not yet support the API tokens without an explicit scope.
 	if os.Getenv("CLOUDFLARE_API_TOKEN") != "" {
@@ -193,7 +167,7 @@ func testAccCloudflareAPITokenWithIndividualCondition(rnd string, permissionID s
 `, rnd, permissionID)
 }
 
-func TestAccCloudflareAPITokenSetAllCondition(t *testing.T) {
+func TestAccAPIToken_SetAllCondition(t *testing.T) {
 	// Temporarily unset CLOUDFLARE_API_TOKEN if it is set as the API token
 	// endpoint does not yet support the API tokens without an explicit scope.
 	if os.Getenv("CLOUDFLARE_API_TOKEN") != "" {
@@ -244,7 +218,7 @@ func testAccCloudflareAPITokenWithAllCondition(rnd string, permissionID string) 
 `, rnd, permissionID)
 }
 
-func testAPITokenConfigAllowDeny(resourceID, name, permissionID, zoneID string, allowAllZonesExceptOne bool) string {
+func testAPITokenConfigAllowDeny(resourceID, permissionID, zoneID string, allowAllZonesExceptOne bool) string {
 	var add string
 	if allowAllZonesExceptOne {
 		add = fmt.Sprintf(`
@@ -262,62 +236,18 @@ func testAPITokenConfigAllowDeny(resourceID, name, permissionID, zoneID string, 
 
 	return fmt.Sprintf(`
 		resource "cloudflare_api_token" "%[1]s" {
-		  name = "%[2]s"
+		  name = "%[1]s"
 
 		  policy {
 			effect = "allow"
 			permission_groups = [
-			  "%[3]s",
+			  "%[2]s",
 			]
 			resources = {
 			  "com.cloudflare.api.account.zone.*" = "*"
 			}
 		  }
-		  %[4]s
+		  %[3]s
 		}
-		`, resourceID, name, permissionID, add)
-}
-
-func testAccCloudflareAPITokenMultiplePermissionsGroups(rnd string) string {
-	return fmt.Sprintf(`
-	resource "cloudflare_api_token" "%[1]s" {
-		name = "%[1]s"
-
-		policy {
-			effect = "allow"
-			permission_groups = [
-				"3030687196b94b638145a3953da2b699",
-				"da6d2d6f2ec8442eaadda60d13f42bca",
-				"e6d2666161e84845a636613608cee8d5",
-				"ed07f6c337da4195b4e72a1fb2c6bcae",
-				"4755a26eedb94da69e1066d98aa820be",
-				"1af1fa2adc104452b74a9a3364202f20",
-				"43137f8d07884d3198dc0ee77ca6e79b",
-			]
-			resources = { "com.cloudflare.api.account.*" = "*" }
-		}
-	}
-`, rnd)
-}
-
-func testAccCloudflareAPITokenMultiplePermissionsGroupsReordered(rnd string) string {
-	return fmt.Sprintf(`
-	resource "cloudflare_api_token" "%[1]s" {
-		name = "%[1]s"
-
-		policy {
-			effect = "allow"
-			permission_groups = [
-				"1af1fa2adc104452b74a9a3364202f20",
-				"43137f8d07884d3198dc0ee77ca6e79b",
-				"3030687196b94b638145a3953da2b699",
-				"da6d2d6f2ec8442eaadda60d13f42bca",
-				"e6d2666161e84845a636613608cee8d5",
-				"ed07f6c337da4195b4e72a1fb2c6bcae",
-				"4755a26eedb94da69e1066d98aa820be",
-			]
-			resources = { "com.cloudflare.api.account.*" = "*" }
-		}
-	}
-`, rnd)
+		`, resourceID, permissionID, add)
 }

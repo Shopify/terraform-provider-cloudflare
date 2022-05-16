@@ -2,7 +2,6 @@ package cloudflare
 
 import (
 	"bytes"
-	"context"
 	"crypto/md5"
 	"fmt"
 	"hash/crc32"
@@ -11,7 +10,6 @@ import (
 	"sort"
 	"strings"
 
-	cloudflare "github.com/cloudflare/cloudflare-go"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -22,16 +20,6 @@ func expandInterfaceToStringList(list interface{}) []string {
 		vs = append(vs, v.(string))
 	}
 	return vs
-}
-
-func expandSetToStringList(setInterface interface{}) []string {
-	set := setInterface.(*schema.Set)
-	list := make([]string, set.Len())
-	for i, ele := range set.List() {
-		list[i] = ele.(string)
-	}
-
-	return list
 }
 
 func expandStringListToSet(list []string) *schema.Set {
@@ -94,6 +82,15 @@ func contains(slice []string, item string) bool {
 	return ok
 }
 
+func sliceContainsInt(s []int, e int) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
+}
+
 func itemExistsInSlice(slice interface{}, item interface{}) bool {
 	s := reflect.ValueOf(slice)
 
@@ -134,21 +131,6 @@ func stringFromBool(status bool) string {
 		return "on"
 	}
 	return "off"
-}
-
-func getAccountIDFromZoneID(d *schema.ResourceData, client *cloudflare.API) (string, error) {
-	accountID := d.Get("account_id").(string)
-	if accountID == "" {
-		zoneID := d.Get("zone_id").(string)
-		zone, err := client.ZoneDetails(context.Background(), zoneID)
-		if err != nil {
-			return "", fmt.Errorf("error retrieving zone for zone_id %q: %s", zoneID, err)
-		}
-		accountID = zone.Account.ID
-	}
-
-	d.Set("account_id", accountID)
-	return accountID, nil
 }
 
 // AccessIdentifier represents the identifier provided in a resource

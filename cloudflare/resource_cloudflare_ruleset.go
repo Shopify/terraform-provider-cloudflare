@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/cloudflare/cloudflare-go"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/pkg/errors"
 )
@@ -22,18 +23,26 @@ const (
 
 func resourceCloudflareRuleset() *schema.Resource {
 	return &schema.Resource{
-		Schema: resourceCloudflareRulesetSchema(),
-		Create: resourceCloudflareRulesetCreate,
-		Read:   resourceCloudflareRulesetRead,
-		Update: resourceCloudflareRulesetUpdate,
-		Delete: resourceCloudflareRulesetDelete,
+		Schema:        resourceCloudflareRulesetSchema(),
+		CreateContext: resourceCloudflareRulesetCreate,
+		ReadContext:   resourceCloudflareRulesetRead,
+		UpdateContext: resourceCloudflareRulesetUpdate,
+		DeleteContext: resourceCloudflareRulesetDelete,
 		Importer: &schema.ResourceImporter{
-			State: resourceCloudflareRulesetImport,
+			StateContext: resourceCloudflareRulesetImport,
+		},
+		SchemaVersion: 1,
+		StateUpgraders: []schema.StateUpgrader{
+			{
+				Type:    resourceCloudflareRulesetSchemaV0().CoreConfigSchema().ImpliedType(),
+				Upgrade: resourceCloudflareRulesetStateUpgradeV0ToV1,
+				Version: 0,
+			},
 		},
 	}
 }
 
-func resourceCloudflareRulesetCreate(d *schema.ResourceData, meta interface{}) error {
+func resourceCloudflareRulesetCreate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	client := meta.(*cloudflare.API)
 	accountID := d.Get("account_id").(string)
 	zoneID := d.Get("zone_id").(string)
@@ -42,9 +51,9 @@ func resourceCloudflareRulesetCreate(d *schema.ResourceData, meta interface{}) e
 	var ruleset cloudflare.Ruleset
 	var sempahoreErr error
 	if accountID != "" {
-		ruleset, sempahoreErr = client.GetAccountRulesetPhase(context.Background(), accountID, rulesetPhase)
+		ruleset, sempahoreErr = client.GetAccountRulesetPhase(ctx, accountID, rulesetPhase)
 	} else {
-		ruleset, sempahoreErr = client.GetZoneRulesetPhase(context.Background(), zoneID, rulesetPhase)
+		ruleset, sempahoreErr = client.GetZoneRulesetPhase(ctx, zoneID, rulesetPhase)
 	}
 
 	if len(ruleset.Rules) > 0 {
@@ -52,7 +61,7 @@ func resourceCloudflareRulesetCreate(d *schema.ResourceData, meta interface{}) e
 		if accountID == "" {
 			deleteRulesetURL = zoneLevelRulesetDeleteURL
 		}
-		return fmt.Errorf(duplicateRulesetError, rulesetPhase, deleteRulesetURL)
+		return diag.FromErr(fmt.Errorf(duplicateRulesetError, rulesetPhase, deleteRulesetURL))
 	}
 
 	rulesetName := d.Get("name").(string)
@@ -67,7 +76,7 @@ func resourceCloudflareRulesetCreate(d *schema.ResourceData, meta interface{}) e
 
 	rules, err := buildRulesetRulesFromResource(d)
 	if err != nil {
-		return fmt.Errorf("error building ruleset rules from resource: %w", err)
+		return diag.FromErr(fmt.Errorf("error building ruleset rules from resource: %w", err))
 	}
 
 	if len(rules) > 0 {
@@ -78,25 +87,25 @@ func resourceCloudflareRulesetCreate(d *schema.ResourceData, meta interface{}) e
 		log.Print("[DEBUG] default ruleset created by the UI with empty rules found, recreating from scratch")
 		var deleteRulesetErr error
 		if accountID != "" {
-			deleteRulesetErr = client.DeleteAccountRuleset(context.Background(), accountID, ruleset.ID)
+			deleteRulesetErr = client.DeleteAccountRuleset(ctx, accountID, ruleset.ID)
 		} else {
-			deleteRulesetErr = client.DeleteZoneRuleset(context.Background(), zoneID, ruleset.ID)
+			deleteRulesetErr = client.DeleteZoneRuleset(ctx, zoneID, ruleset.ID)
 		}
 
 		if deleteRulesetErr != nil {
-			return fmt.Errorf("failed to delete ruleset: %w", deleteRulesetErr)
+			return diag.FromErr(fmt.Errorf("failed to delete ruleset: %w", deleteRulesetErr))
 		}
 	}
 
 	var rulesetCreateErr error
 	if accountID != "" {
-		ruleset, rulesetCreateErr = client.CreateAccountRuleset(context.Background(), accountID, rs)
+		ruleset, rulesetCreateErr = client.CreateAccountRuleset(ctx, accountID, rs)
 	} else {
-		ruleset, rulesetCreateErr = client.CreateZoneRuleset(context.Background(), zoneID, rs)
+		ruleset, rulesetCreateErr = client.CreateZoneRuleset(ctx, zoneID, rs)
 	}
 
 	if rulesetCreateErr != nil {
-		return fmt.Errorf("error creating ruleset %s: %w", rulesetName, rulesetCreateErr)
+		return diag.FromErr(fmt.Errorf("error creating ruleset %s: %w", rulesetName, rulesetCreateErr))
 	}
 
 	rulesetEntryPoint := cloudflare.Ruleset{
@@ -108,26 +117,26 @@ func resourceCloudflareRulesetCreate(d *schema.ResourceData, meta interface{}) e
 	// endpoint.
 	if rulesetKind != string(cloudflare.RulesetKindCustom) {
 		if accountID != "" {
-			_, err = client.UpdateAccountRulesetPhase(context.Background(), accountID, rulesetPhase, rulesetEntryPoint)
+			_, err = client.UpdateAccountRulesetPhase(ctx, accountID, rulesetPhase, rulesetEntryPoint)
 		} else {
-			_, err = client.UpdateZoneRulesetPhase(context.Background(), zoneID, rulesetPhase, rulesetEntryPoint)
+			_, err = client.UpdateZoneRulesetPhase(ctx, zoneID, rulesetPhase, rulesetEntryPoint)
 		}
 
 		if err != nil {
-			return fmt.Errorf("error updating ruleset phase entrypoint %s: %w", rulesetName, err)
+			return diag.FromErr(fmt.Errorf("error updating ruleset phase entrypoint %s: %w", rulesetName, err))
 		}
 	}
 
 	d.SetId(ruleset.ID)
 
-	return resourceCloudflareRulesetRead(d, meta)
+	return resourceCloudflareRulesetRead(ctx, d, meta)
 }
 
-func resourceCloudflareRulesetImport(d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
+func resourceCloudflareRulesetImport(ctx context.Context, d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
 	return nil, errors.New("Import is not yet supported for Rulesets")
 }
 
-func resourceCloudflareRulesetRead(d *schema.ResourceData, meta interface{}) error {
+func resourceCloudflareRulesetRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	client := meta.(*cloudflare.API)
 	accountID := d.Get("account_id").(string)
 	zoneID := d.Get("zone_id").(string)
@@ -136,9 +145,9 @@ func resourceCloudflareRulesetRead(d *schema.ResourceData, meta interface{}) err
 	var err error
 
 	if accountID != "" {
-		ruleset, err = client.GetAccountRuleset(context.Background(), accountID, d.Id())
+		ruleset, err = client.GetAccountRuleset(ctx, accountID, d.Id())
 	} else {
-		ruleset, err = client.GetZoneRuleset(context.Background(), zoneID, d.Id())
+		ruleset, err = client.GetZoneRuleset(ctx, zoneID, d.Id())
 	}
 
 	if err != nil {
@@ -147,57 +156,57 @@ func resourceCloudflareRulesetRead(d *schema.ResourceData, meta interface{}) err
 			d.SetId("")
 			return nil
 		}
-		return fmt.Errorf("error reading ruleset ID %q: %w", d.Id(), err)
+		return diag.FromErr(fmt.Errorf("error reading ruleset ID %q: %w", d.Id(), err))
 	}
 
 	d.Set("name", ruleset.Name)
 	d.Set("description", ruleset.Description)
 
 	if err := d.Set("rules", buildStateFromRulesetRules(ruleset.Rules)); err != nil {
-		log.Fatalf("failed to set rules: %s", err)
+		return diag.FromErr(err)
 	}
 
 	return nil
 }
 
-func resourceCloudflareRulesetUpdate(d *schema.ResourceData, meta interface{}) error {
+func resourceCloudflareRulesetUpdate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	client := meta.(*cloudflare.API)
 	accountID := d.Get("account_id").(string)
 	zoneID := d.Get("zone_id").(string)
 
 	rules, err := buildRulesetRulesFromResource(d)
 	if err != nil {
-		return fmt.Errorf("error building ruleset from resource: %w", err)
+		return diag.FromErr(fmt.Errorf("error building ruleset from resource: %w", err))
 	}
 
 	description := d.Get("description").(string)
 	if accountID != "" {
-		_, err = client.UpdateAccountRuleset(context.Background(), accountID, d.Id(), description, rules)
+		_, err = client.UpdateAccountRuleset(ctx, accountID, d.Id(), description, rules)
 	} else {
-		_, err = client.UpdateZoneRuleset(context.Background(), zoneID, d.Id(), description, rules)
+		_, err = client.UpdateZoneRuleset(ctx, zoneID, d.Id(), description, rules)
 	}
 
 	if err != nil {
-		return fmt.Errorf("error updating ruleset with ID %q: %w", d.Id(), err)
+		return diag.FromErr(fmt.Errorf("error updating ruleset with ID %q: %w", d.Id(), err))
 	}
 
-	return resourceCloudflareRulesetRead(d, meta)
+	return resourceCloudflareRulesetRead(ctx, d, meta)
 }
 
-func resourceCloudflareRulesetDelete(d *schema.ResourceData, meta interface{}) error {
+func resourceCloudflareRulesetDelete(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	client := meta.(*cloudflare.API)
 	accountID := d.Get("account_id").(string)
 	zoneID := d.Get("zone_id").(string)
 	var err error
 
 	if accountID != "" {
-		err = client.DeleteAccountRuleset(context.Background(), accountID, d.Id())
+		err = client.DeleteAccountRuleset(ctx, accountID, d.Id())
 	} else {
-		err = client.DeleteZoneRuleset(context.Background(), zoneID, d.Id())
+		err = client.DeleteZoneRuleset(ctx, zoneID, d.Id())
 	}
 
 	if err != nil {
-		return fmt.Errorf("error deleting ruleset with ID %q: %w", d.Id(), err)
+		return diag.FromErr(fmt.Errorf("error deleting ruleset with ID %q: %w", d.Id(), err))
 	}
 
 	return nil
@@ -220,13 +229,17 @@ func buildStateFromRulesetRules(rules []cloudflare.RulesetRule) interface{} {
 		}
 
 		if !reflect.ValueOf(r.ActionParameters).IsNil() {
-			var actionParameters []map[string]interface{}
-			var overrides []map[string]interface{}
-			var idBasedOverrides []map[string]interface{}
-			var categoryBasedOverrides []map[string]interface{}
-			var headers []map[string]interface{}
-			var uri []map[string]interface{}
-			var matchedData []map[string]interface{}
+			var (
+				actionParameters       []map[string]interface{}
+				overrides              []map[string]interface{}
+				idBasedOverrides       []map[string]interface{}
+				categoryBasedOverrides []map[string]interface{}
+				headers                []map[string]interface{}
+				uri                    []map[string]interface{}
+				matchedData            []map[string]interface{}
+				response               []map[string]interface{}
+				origin                 []map[string]interface{}
+			)
 			actionParameterRules := make(map[string]string)
 
 			if !reflect.ValueOf(r.ActionParameters.Overrides).IsNil() {
@@ -314,6 +327,21 @@ func buildStateFromRulesetRules(rules []cloudflare.RulesetRule) interface{} {
 				}
 			}
 
+			if !reflect.ValueOf(r.ActionParameters.Response).IsNil() {
+				response = append(response, map[string]interface{}{
+					"status_code":  r.ActionParameters.Response.StatusCode,
+					"content_type": r.ActionParameters.Response.ContentType,
+					"content":      r.ActionParameters.Response.Content,
+				})
+			}
+
+			if !reflect.ValueOf(r.ActionParameters.Origin).IsNil() {
+				origin = append(origin, map[string]interface{}{
+					"host": r.ActionParameters.Origin.Host,
+					"port": r.ActionParameters.Origin.Port,
+				})
+			}
+
 			actionParameters = append(actionParameters, map[string]interface{}{
 				"id":           r.ActionParameters.ID,
 				"increment":    r.ActionParameters.Increment,
@@ -326,7 +354,10 @@ func buildStateFromRulesetRules(rules []cloudflare.RulesetRule) interface{} {
 				"rules":        actionParameterRules,
 				"uri":          uri,
 				"matched_data": matchedData,
+				"response":     response,
 				"version":      r.ActionParameters.Version,
+				"host_header":  r.ActionParameters.HostHeader,
+				"origin":       origin,
 			})
 
 			rule["action_parameters"] = actionParameters
@@ -340,6 +371,8 @@ func buildStateFromRulesetRules(rules []cloudflare.RulesetRule) interface{} {
 				"period":              r.RateLimit.Period,
 				"requests_per_period": r.RateLimit.RequestsPerPeriod,
 				"mitigation_timeout":  r.RateLimit.MitigationTimeout,
+				"counting_expression": r.RateLimit.CountingExpression,
+				"requests_to_origin":  r.RateLimit.RequestsToOrigin,
 			})
 
 			rule["ratelimit"] = rateLimit
@@ -354,6 +387,16 @@ func buildStateFromRulesetRules(rules []cloudflare.RulesetRule) interface{} {
 			})
 
 			rule["exposed_credential_check"] = exposedCredentialCheck
+		}
+
+		if !reflect.ValueOf(r.Logging).IsNil() {
+			var logging []map[string]interface{}
+
+			logging = append(logging, map[string]interface{}{
+				"enabled": r.Logging.Enabled,
+			})
+
+			rule["logging"] = logging
 		}
 
 		rulesData = append(rulesData, rule)
@@ -442,7 +485,7 @@ func buildRulesetRulesFromResource(d *schema.ResourceData) ([]cloudflare.Ruleset
 						for overrideCounter, overrideParamValue := range pValue.([]interface{}) {
 							//nolint:staticcheck
 							if value, ok := d.GetOkExists(fmt.Sprintf("rules.%d.action_parameters.0.overrides.%d.enabled", rulesCounter, overrideCounter)); ok {
-								overrideConfiguration.Enabled = &[]bool{value.(bool)}[0]
+								overrideConfiguration.Enabled = cloudflare.BoolPtr(value.(bool))
 							}
 
 							if val, ok := overrideParamValue.(map[string]interface{})["action"]; ok {
@@ -456,7 +499,7 @@ func buildRulesetRulesFromResource(d *schema.ResourceData) ([]cloudflare.Ruleset
 									categories = append(categories, cloudflare.RulesetRuleActionParametersCategories{
 										Category: cData["category"].(string),
 										Action:   cData["action"].(string),
-										Enabled:  cData["enabled"].(bool),
+										Enabled:  cloudflare.BoolPtr(cData["enabled"].(bool)),
 									})
 								}
 							}
@@ -469,7 +512,7 @@ func buildRulesetRulesFromResource(d *schema.ResourceData) ([]cloudflare.Ruleset
 									var enabled *bool
 									//nolint:staticcheck
 									if value, ok := d.GetOkExists(fmt.Sprintf("rules.%d.action_parameters.0.overrides.%d.rules.%d.enabled", rulesCounter, overrideCounter, ruleOverrideCounter)); ok {
-										enabled = &[]bool{value.(bool)}[0]
+										enabled = cloudflare.BoolPtr(value.(bool))
 									}
 
 									rules = append(rules, cloudflare.RulesetRuleActionParametersRules{
@@ -496,6 +539,15 @@ func buildRulesetRulesFromResource(d *schema.ResourceData) ([]cloudflare.Ruleset
 						for i := range pValue.([]interface{}) {
 							rule.ActionParameters.MatchedData = &cloudflare.RulesetRuleActionParametersMatchedData{
 								PublicKey: pValue.([]interface{})[i].(map[string]interface{})["public_key"].(string),
+							}
+						}
+
+					case "response":
+						for i := range pValue.([]interface{}) {
+							rule.ActionParameters.Response = &cloudflare.RulesetRuleActionParametersBlockResponse{
+								StatusCode:  uint16(pValue.([]interface{})[i].(map[string]interface{})["status_code"].(int)),
+								ContentType: pValue.([]interface{})[i].(map[string]interface{})["content_type"].(string),
+								Content:     pValue.([]interface{})[i].(map[string]interface{})["content"].(string),
 							}
 						}
 
@@ -535,6 +587,16 @@ func buildRulesetRulesFromResource(d *schema.ResourceData) ([]cloudflare.Ruleset
 
 						rule.ActionParameters.Headers = headers
 
+					case "host_header":
+						rule.ActionParameters.HostHeader = pValue.(string)
+					case "origin":
+						for i := range pValue.([]interface{}) {
+							rule.ActionParameters.Origin = &cloudflare.RulesetRuleActionParametersOrigin{
+								Host: pValue.([]interface{})[i].(map[string]interface{})["host"].(string),
+								Port: uint16(pValue.([]interface{})[i].(map[string]interface{})["port"].(int)),
+							}
+						}
+
 					default:
 						log.Printf("[DEBUG] unknown key encountered in buildRulesetRulesFromResource for action parameters: %s", pKey)
 					}
@@ -559,8 +621,10 @@ func buildRulesetRulesFromResource(d *schema.ResourceData) ([]cloudflare.Ruleset
 						rule.RateLimit.RequestsPerPeriod = pValue.(int)
 					case "mitigation_timeout":
 						rule.RateLimit.MitigationTimeout = pValue.(int)
-					case "mitigation_expression":
-						rule.RateLimit.MitigationExpression = pValue.(string)
+					case "counting_expression":
+						rule.RateLimit.CountingExpression = pValue.(string)
+					case "requests_to_origin":
+						rule.RateLimit.RequestsToOrigin = pValue.(bool)
 
 					default:
 						log.Printf("[DEBUG] unknown key encountered in buildRulesetRulesFromResource for ratelimit: %s", pKey)
@@ -581,6 +645,21 @@ func buildRulesetRulesFromResource(d *schema.ResourceData) ([]cloudflare.Ruleset
 
 					default:
 						log.Printf("[DEBUG] unknown key encountered in buildRulesetRulesFromResource for exposed_credential_check: %s", pKey)
+					}
+				}
+			}
+		}
+
+		if len(resourceRule["logging"].([]interface{})) > 0 {
+			rule.Logging = &cloudflare.RulesetRuleLogging{}
+			for _, parameter := range resourceRule["logging"].([]interface{}) {
+				for pKey, pValue := range parameter.(map[string]interface{}) {
+					switch pKey {
+					case "enabled":
+						rule.Logging.Enabled = cloudflare.BoolPtr(pValue.(bool))
+
+					default:
+						log.Printf("[DEBUG] unknown key encountered in buildRulesetRulesFromResource for logging: %s", pKey)
 					}
 				}
 			}

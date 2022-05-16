@@ -755,6 +755,10 @@ func TestAccCloudflareRuleset_RateLimit(t *testing.T) {
 
 					resource.TestCheckResourceAttr(resourceName, "rules.#", "1"),
 					resource.TestCheckResourceAttr(resourceName, "rules.0.action", "block"),
+					resource.TestCheckResourceAttr(resourceName, "rules.0.action_parameters.0.response.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "rules.0.action_parameters.0.response.0.status_code", "418"),
+					resource.TestCheckResourceAttr(resourceName, "rules.0.action_parameters.0.response.0.content_type", "text/plain"),
+					resource.TestCheckResourceAttr(resourceName, "rules.0.action_parameters.0.response.0.content", "test content"),
 					resource.TestCheckResourceAttr(resourceName, "rules.0.expression", "(http.request.uri.path matches \"^/api/\")"),
 					resource.TestCheckResourceAttr(resourceName, "rules.0.description", "example http rate limit"),
 					resource.TestCheckResourceAttr(resourceName, "rules.0.ratelimit.#", "1"),
@@ -762,7 +766,51 @@ func TestAccCloudflareRuleset_RateLimit(t *testing.T) {
 					resource.TestCheckResourceAttr(resourceName, "rules.0.ratelimit.0.characteristics.#", "2"),
 					resource.TestCheckResourceAttr(resourceName, "rules.0.ratelimit.0.period", "60"),
 					resource.TestCheckResourceAttr(resourceName, "rules.0.ratelimit.0.requests_per_period", "100"),
-					resource.TestCheckResourceAttr(resourceName, "rules.0.ratelimit.0.mitigation_timeout", "600"),
+					resource.TestCheckResourceAttr(resourceName, "rules.0.ratelimit.0.mitigation_timeout", "60"),
+					resource.TestCheckResourceAttr(resourceName, "rules.0.ratelimit.0.requests_to_origin", "true"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccCloudflareRuleset_RequestOrigin(t *testing.T) {
+	// Temporarily unset CLOUDFLARE_API_TOKEN if it is set as the WAF
+	// service does not yet support the API tokens and it results in
+	// misleading state error messages.
+	if os.Getenv("CLOUDFLARE_API_TOKEN") != "" {
+		defer func(apiToken string) {
+			os.Setenv("CLOUDFLARE_API_TOKEN", apiToken)
+		}(os.Getenv("CLOUDFLARE_API_TOKEN"))
+		os.Setenv("CLOUDFLARE_API_TOKEN", "")
+	}
+
+	t.Parallel()
+	rnd := generateRandomResourceName()
+	zoneID := os.Getenv("CLOUDFLARE_ZONE_ID")
+	zoneName := os.Getenv("CLOUDFLARE_DOMAIN")
+	resourceName := "cloudflare_ruleset." + rnd
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:  func() { testAccPreCheck(t) },
+		Providers: testAccProviders,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccCheckCloudflareRulesetOrigin(rnd, "example HTTP request origin", zoneID, zoneName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "name", "example HTTP request origin"),
+					resource.TestCheckResourceAttr(resourceName, "description", rnd+" ruleset description"),
+					resource.TestCheckResourceAttr(resourceName, "kind", "zone"),
+					resource.TestCheckResourceAttr(resourceName, "phase", "http_request_origin"),
+
+					resource.TestCheckResourceAttr(resourceName, "rules.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "rules.0.action", "route"),
+					resource.TestCheckResourceAttr(resourceName, "rules.0.action_parameters.0.host_header", "some.host"),
+					resource.TestCheckResourceAttr(resourceName, "rules.0.action_parameters.0.origin.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "rules.0.action_parameters.0.origin.0.host", "some.host"),
+					resource.TestCheckResourceAttr(resourceName, "rules.0.action_parameters.0.origin.0.port", "80"),
+					resource.TestCheckResourceAttr(resourceName, "rules.0.expression", "(http.request.uri.path matches \"^/api/\")"),
+					resource.TestCheckResourceAttr(resourceName, "rules.0.description", "example http request origin"),
 				),
 			},
 		},
@@ -1249,6 +1297,47 @@ func TestAccCloudflareRuleset_ExposedCredentialCheck(t *testing.T) {
 
 					resource.TestCheckResourceAttr(resourceName, "rules.0.exposed_credential_check.0.username_expression", "url_decode(http.request.body.form[\"username\"][0])"),
 					resource.TestCheckResourceAttr(resourceName, "rules.0.exposed_credential_check.0.password_expression", "url_decode(http.request.body.form[\"password\"][0])"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccCloudflareRuleset_Logging(t *testing.T) {
+	// Temporarily unset CLOUDFLARE_API_TOKEN if it is set as the WAF
+	// service does not yet support the API tokens and it results in
+	// misleading state error messages.
+	if os.Getenv("CLOUDFLARE_API_TOKEN") != "" {
+		defer func(apiToken string) {
+			os.Setenv("CLOUDFLARE_API_TOKEN", apiToken)
+		}(os.Getenv("CLOUDFLARE_API_TOKEN"))
+		os.Setenv("CLOUDFLARE_API_TOKEN", "")
+	}
+
+	t.Parallel()
+	rnd := generateRandomResourceName()
+	accountID := os.Getenv("CLOUDFLARE_ACCOUNT_ID")
+	resourceName := "cloudflare_ruleset." + rnd
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:  func() { testAccPreCheck(t) },
+		Providers: testAccProviders,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccCheckCloudflareRulesetDisableLoggingForSkipAction(rnd, "example disable logging for skip rule", accountID),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "name", "example disable logging for skip rule"),
+					resource.TestCheckResourceAttr(resourceName, "description", "This ruleset includes a skip rule whose logging is disabled."),
+					resource.TestCheckResourceAttr(resourceName, "kind", "root"),
+					resource.TestCheckResourceAttr(resourceName, "phase", "http_request_firewall_managed"),
+
+					resource.TestCheckResourceAttr(resourceName, "rules.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "rules.0.action", "skip"),
+					resource.TestCheckResourceAttr(resourceName, "rules.0.expression", "true"),
+					resource.TestCheckResourceAttr(resourceName, "rules.0.description", "example disabled logging"),
+					resource.TestCheckResourceAttr(resourceName, "rules.0.logging.#", "1"),
+
+					resource.TestCheckResourceAttr(resourceName, "rules.0.logging.0.enabled", "false"),
 				),
 			},
 		},
@@ -1966,6 +2055,31 @@ func testAccCheckCloudflareRulesetManagedWAFPayloadLogging(rnd, name, zoneID, zo
   }`, rnd, name, zoneID, zoneName)
 }
 
+func testAccCheckCloudflareRulesetOrigin(rnd, name, zoneID, zoneName string) string {
+	return fmt.Sprintf(`
+  resource "cloudflare_ruleset" "%[1]s" {
+    zone_id  = "%[3]s"
+    name        = "%[2]s"
+    description = "%[1]s ruleset description"
+    kind        = "zone"
+    phase       = "http_request_origin"
+
+    rules {
+      action = "route"
+      action_parameters {
+        host_header = "some.host"
+        origin {
+          host = "some.host"
+          port = 80
+        }
+      }
+      expression = "(http.request.uri.path matches \"^/api/\")"
+      description = "example http request origin"
+      enabled = true
+    }
+  }`, rnd, name, zoneID, zoneName)
+}
+
 func testAccCheckCloudflareRulesetRateLimit(rnd, name, zoneID, zoneName string) string {
 	return fmt.Sprintf(`
   resource "cloudflare_ruleset" "%[1]s" {
@@ -1977,6 +2091,13 @@ func testAccCheckCloudflareRulesetRateLimit(rnd, name, zoneID, zoneName string) 
 
     rules {
       action = "block"
+      action_parameters {
+        response {
+          status_code = 418
+          content_type = "text/plain"
+          content = "test content"
+        }
+      }
       ratelimit {
         characteristics = [
           "cf.colo.id",
@@ -1984,7 +2105,8 @@ func testAccCheckCloudflareRulesetRateLimit(rnd, name, zoneID, zoneName string) 
         ]
         period = 60
         requests_per_period = 100
-        mitigation_timeout = 600
+        mitigation_timeout = 60
+        requests_to_origin = true
       }
       expression = "(http.request.uri.path matches \"^/api/\")"
       description = "example http rate limit"
@@ -2189,6 +2311,31 @@ func testAccCheckCloudflareRulesetExposedCredentialCheck(rnd, name, accountID st
       exposed_credential_check {
         username_expression = "url_decode(http.request.body.form[\"username\"][0])"
         password_expression = "url_decode(http.request.body.form[\"password\"][0])"
+      }
+    }
+  }
+`, rnd, name, accountID)
+}
+
+func testAccCheckCloudflareRulesetDisableLoggingForSkipAction(rnd, name, accountID string) string {
+	return fmt.Sprintf(`
+  resource "cloudflare_ruleset" "%[1]s" {
+    account_id  = "%[3]s"
+    name        = "%[2]s"
+    description = "This ruleset includes a skip rule whose logging is disabled."
+    kind        = "root"
+    phase       = "http_request_firewall_managed"
+
+    rules {
+      action = "skip"
+      action_parameters {
+        ruleset = "current"
+      }
+      expression = "true"
+      enabled = true
+      description = "example disabled logging"
+      logging {
+        enabled = false
       }
     }
   }

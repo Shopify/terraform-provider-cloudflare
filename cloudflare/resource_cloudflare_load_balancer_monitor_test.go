@@ -14,8 +14,6 @@ import (
 )
 
 func TestAccCloudflareLoadBalancerMonitor_Basic(t *testing.T) {
-	// multiple instances of this config would conflict but we only use it once
-	t.Parallel()
 	testStartTime := time.Now().UTC()
 	var loadBalancerMonitor cloudflare.LoadBalancerMonitor
 	name := "cloudflare_load_balancer_monitor.test"
@@ -42,7 +40,6 @@ func TestAccCloudflareLoadBalancerMonitor_Basic(t *testing.T) {
 }
 
 func TestAccCloudflareLoadBalancerMonitor_FullySpecified(t *testing.T) {
-	t.Parallel()
 	var loadBalancerMonitor cloudflare.LoadBalancerMonitor
 	name := "cloudflare_load_balancer_monitor.test"
 	zoneName := os.Getenv("CLOUDFLARE_DOMAIN")
@@ -70,7 +67,6 @@ func TestAccCloudflareLoadBalancerMonitor_FullySpecified(t *testing.T) {
 }
 
 func TestAccCloudflareLoadBalancerMonitor_EmptyExpectedBody(t *testing.T) {
-	t.Parallel()
 	var loadBalancerMonitor cloudflare.LoadBalancerMonitor
 	rnd := generateRandomResourceName()
 	name := fmt.Sprintf("cloudflare_load_balancer_monitor.%s", rnd)
@@ -93,7 +89,6 @@ func TestAccCloudflareLoadBalancerMonitor_EmptyExpectedBody(t *testing.T) {
 }
 
 func TestAccCloudflareLoadBalancerMonitor_TcpFullySpecified(t *testing.T) {
-	t.Parallel()
 	var loadBalancerMonitor cloudflare.LoadBalancerMonitor
 	name := "cloudflare_load_balancer_monitor.test"
 
@@ -116,7 +111,6 @@ func TestAccCloudflareLoadBalancerMonitor_TcpFullySpecified(t *testing.T) {
 }
 
 func TestAccCloudflareLoadBalancerMonitor_PremiumTypes(t *testing.T) {
-	t.Parallel()
 	var loadBalancerMonitor cloudflare.LoadBalancerMonitor
 	rnd := generateRandomResourceName()
 	name := fmt.Sprintf("cloudflare_load_balancer_monitor.%s", rnd)
@@ -155,8 +149,6 @@ func TestAccCloudflareLoadBalancerMonitor_PremiumTypes(t *testing.T) {
 }
 
 func TestAccCloudflareLoadBalancerMonitor_NoRequired(t *testing.T) {
-	t.Parallel()
-
 	resource.Test(t, resource.TestCase{
 		PreCheck:  func() { testAccPreCheck(t) },
 		Providers: testAccProviders,
@@ -170,7 +162,6 @@ func TestAccCloudflareLoadBalancerMonitor_NoRequired(t *testing.T) {
 }
 
 func TestAccCloudflareLoadBalancerMonitor_Update(t *testing.T) {
-	t.Parallel()
 	var loadBalancerMonitor cloudflare.LoadBalancerMonitor
 	var initialId string
 	name := "cloudflare_load_balancer_monitor.test"
@@ -207,7 +198,6 @@ func TestAccCloudflareLoadBalancerMonitor_Update(t *testing.T) {
 }
 
 func TestAccCloudflareLoadBalancerMonitor_CreateAfterManualDestroy(t *testing.T) {
-	t.Parallel()
 	var loadBalancerMonitor cloudflare.LoadBalancerMonitor
 	var initialId string
 	name := "cloudflare_load_balancer_monitor.test"
@@ -283,7 +273,6 @@ func testAccCheckCloudflareLoadBalancerMonitorExists(n string, load *cloudflare.
 
 func testAccCheckCloudflareLoadBalancerMonitorDates(n string, loadBalancerMonitor *cloudflare.LoadBalancerMonitor, testStartTime time.Time) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
-
 		rs, _ := s.RootModule().Resources[n]
 
 		for timeStampAttr, serverVal := range map[string]time.Time{"created_on": *loadBalancerMonitor.CreatedOn, "modified_on": *loadBalancerMonitor.ModifiedOn} {

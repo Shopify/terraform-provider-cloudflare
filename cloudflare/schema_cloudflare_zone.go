@@ -29,10 +29,19 @@ func resourceCloudflareZoneSchema() map[string]*schema.Schema {
 			},
 		},
 		"plan": {
-			Type:         schema.TypeString,
-			Optional:     true,
-			Computed:     true,
-			ValidateFunc: validation.StringInSlice([]string{planIDFree, planIDPro, planIDBusiness, planIDEnterprise}, false),
+			Type:     schema.TypeString,
+			Optional: true,
+			Computed: true,
+			ValidateFunc: validation.StringInSlice([]string{
+				planIDFree,
+				planIDPro,
+				planIDBusiness,
+				planIDEnterprise,
+				planIDPartnerFree,
+				planIDPartnerPro,
+				planIDPartnerBusiness,
+				planIDPartnerEnterprise,
+			}, false),
 		},
 		"meta": {
 			Type:     schema.TypeMap,

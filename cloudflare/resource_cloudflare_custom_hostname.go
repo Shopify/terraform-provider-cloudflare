@@ -8,35 +8,37 @@ import (
 	"strings"
 
 	"github.com/cloudflare/cloudflare-go"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/pkg/errors"
 )
 
 func resourceCloudflareCustomHostname() *schema.Resource {
 	return &schema.Resource{
-		Schema: resourceCloudflareCustomHostnameSchema(),
-		Create: resourceCloudflareCustomHostnameCreate,
-		Read:   resourceCloudflareCustomHostnameRead,
-		Update: resourceCloudflareCustomHostnameUpdate,
-		Delete: resourceCloudflareCustomHostnameDelete,
+		Schema:        resourceCloudflareCustomHostnameSchema(),
+		CreateContext: resourceCloudflareCustomHostnameCreate,
+		ReadContext:   resourceCloudflareCustomHostnameRead,
+		UpdateContext: resourceCloudflareCustomHostnameUpdate,
+		DeleteContext: resourceCloudflareCustomHostnameDelete,
 		Importer: &schema.ResourceImporter{
-			State: resourceCloudflareCustomHostnameImport,
+			StateContext: resourceCloudflareCustomHostnameImport,
 		},
 	}
 }
 
-func resourceCloudflareCustomHostnameRead(d *schema.ResourceData, meta interface{}) error {
+func resourceCloudflareCustomHostnameRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	client := meta.(*cloudflare.API)
 	zoneID := d.Get("zone_id").(string)
 	hostnameID := d.Id()
 
-	customHostname, err := client.CustomHostname(context.Background(), zoneID, hostnameID)
+	customHostname, err := client.CustomHostname(ctx, zoneID, hostnameID)
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("error reading custom hostname %q", hostnameID))
+		return diag.FromErr(errors.Wrap(err, fmt.Sprintf("error reading custom hostname %q", hostnameID)))
 	}
 
 	d.Set("hostname", customHostname.Hostname)
 	d.Set("custom_origin_server", customHostname.CustomOriginServer)
+	d.Set("custom_origin_sni", customHostname.CustomOriginSNI)
 	var sslConfig []map[string]interface{}
 
 	if !reflect.ValueOf(customHostname.SSL).IsNil() {
@@ -83,7 +85,7 @@ func resourceCloudflareCustomHostnameRead(d *schema.ResourceData, meta interface
 	}
 
 	if err := d.Set("ssl", sslConfig); err != nil {
-		return fmt.Errorf("failed to set ssl")
+		return diag.FromErr(fmt.Errorf("failed to set ssl"))
 	}
 
 	ownershipVerificationCfg := map[string]interface{}{
@@ -92,7 +94,7 @@ func resourceCloudflareCustomHostnameRead(d *schema.ResourceData, meta interface
 		"name":  customHostname.OwnershipVerification.Name,
 	}
 	if err := d.Set("ownership_verification", ownershipVerificationCfg); err != nil {
-		return fmt.Errorf("failed to set ownership_verification: %v", err)
+		return diag.FromErr(fmt.Errorf("failed to set ownership_verification: %w", err))
 	}
 
 	ownershipVerificationHTTPCfg := map[string]interface{}{
@@ -100,56 +102,56 @@ func resourceCloudflareCustomHostnameRead(d *schema.ResourceData, meta interface
 		"http_url":  customHostname.OwnershipVerificationHTTP.HTTPUrl,
 	}
 	if err := d.Set("ownership_verification_http", ownershipVerificationHTTPCfg); err != nil {
-		return fmt.Errorf("failed to set ownership_verification_http: %v", err)
+		return diag.FromErr(fmt.Errorf("failed to set ownership_verification_http: %w", err))
 	}
 
 	return nil
 }
 
-func resourceCloudflareCustomHostnameDelete(d *schema.ResourceData, meta interface{}) error {
+func resourceCloudflareCustomHostnameDelete(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	client := meta.(*cloudflare.API)
 	zoneID := d.Get("zone_id").(string)
 	hostnameID := d.Id()
 
-	err := client.DeleteCustomHostname(context.Background(), zoneID, hostnameID)
+	err := client.DeleteCustomHostname(ctx, zoneID, hostnameID)
 	if err != nil {
-		return errors.Wrap(err, "failed to delete custom hostname certificate")
+		return diag.FromErr(errors.Wrap(err, "failed to delete custom hostname certificate"))
 	}
 
 	return nil
 }
 
-func resourceCloudflareCustomHostnameCreate(d *schema.ResourceData, meta interface{}) error {
+func resourceCloudflareCustomHostnameCreate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	client := meta.(*cloudflare.API)
 	zoneID := d.Get("zone_id").(string)
 
 	certificate := buildCustomHostname(d)
 
-	newCertificate, err := client.CreateCustomHostname(context.Background(), zoneID, certificate)
+	newCertificate, err := client.CreateCustomHostname(ctx, zoneID, certificate)
 	if err != nil {
-		return errors.Wrap(err, "failed to create custom hostname certificate")
+		return diag.FromErr(errors.Wrap(err, "failed to create custom hostname certificate"))
 	}
 
 	d.SetId(newCertificate.Result.ID)
 
-	return resourceCloudflareCustomHostnameRead(d, meta)
+	return resourceCloudflareCustomHostnameRead(ctx, d, meta)
 }
 
-func resourceCloudflareCustomHostnameUpdate(d *schema.ResourceData, meta interface{}) error {
+func resourceCloudflareCustomHostnameUpdate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	client := meta.(*cloudflare.API)
 	zoneID := d.Get("zone_id").(string)
 	hostnameID := d.Id()
 	certificate := buildCustomHostname(d)
 
-	_, err := client.UpdateCustomHostname(context.Background(), zoneID, hostnameID, certificate)
+	_, err := client.UpdateCustomHostname(ctx, zoneID, hostnameID, certificate)
 	if err != nil {
-		return errors.Wrap(err, "failed to update custom hostname certificate")
+		return diag.FromErr(errors.Wrap(err, "failed to update custom hostname certificate"))
 	}
 
-	return resourceCloudflareCustomHostnameRead(d, meta)
+	return resourceCloudflareCustomHostnameRead(ctx, d, meta)
 }
 
-func resourceCloudflareCustomHostnameImport(d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
+func resourceCloudflareCustomHostnameImport(ctx context.Context, d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
 	idAttr := strings.SplitN(d.Id(), "/", 2)
 
 	if len(idAttr) != 2 {
@@ -172,13 +174,14 @@ func buildCustomHostname(d *schema.ResourceData) cloudflare.CustomHostname {
 	ch := cloudflare.CustomHostname{
 		Hostname:           d.Get("hostname").(string),
 		CustomOriginServer: d.Get("custom_origin_server").(string),
+		CustomOriginSNI:    d.Get("custom_origin_sni").(string),
 	}
 
 	if _, ok := d.GetOk("ssl"); ok {
 		ch.SSL = &cloudflare.CustomHostnameSSL{
 			Method:               d.Get("ssl.0.method").(string),
 			Type:                 d.Get("ssl.0.type").(string),
-			Wildcard:             &[]bool{d.Get("ssl.0.wildcard").(bool)}[0],
+			Wildcard:             cloudflare.BoolPtr(d.Get("ssl.0.wildcard").(bool)),
 			CustomCertificate:    d.Get("ssl.0.custom_certificate").(string),
 			CustomKey:            d.Get("ssl.0.custom_key").(string),
 			CertificateAuthority: d.Get("ssl.0.certificate_authority").(string),

@@ -133,7 +133,7 @@ func resourceCloudflareAccessApplicationSchema() map[string]*schema.Schema {
 		"http_only_cookie_attribute": {
 			Type:     schema.TypeBool,
 			Optional: true,
-			Default:  false,
+			Computed: true,
 		},
 		"same_site_cookie_attribute": {
 			Type:     schema.TypeString,
@@ -153,6 +153,11 @@ func resourceCloudflareAccessApplicationSchema() map[string]*schema.Schema {
 			Optional: true,
 			Default:  true,
 		},
+		"service_auth_401_redirect": {
+			Type:     schema.TypeBool,
+			Optional: true,
+			Default:  false,
+		},
 	}
 }
 
@@ -162,7 +167,6 @@ func convertCORSSchemaToStruct(d *schema.ResourceData) (*cloudflare.AccessApplic
 	if _, ok := d.GetOk("cors_headers"); ok {
 		if allowedMethods, ok := d.GetOk("cors_headers.0.allowed_methods"); ok {
 			CORSConfig.AllowedMethods = expandInterfaceToStringList(allowedMethods.(*schema.Set).List())
-
 		}
 
 		if allowedHeaders, ok := d.GetOk("cors_headers.0.allowed_headers"); ok {

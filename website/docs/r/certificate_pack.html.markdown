@@ -49,6 +49,7 @@ resource "cloudflare_certificate_pack" "advanced_example_for_lets_encrypt" {
   validity_days         = 90
   certificate_authority = "lets_encrypt"
   cloudflare_branding   = false
+  wait_for_active_status = true
 }
 ```
 
@@ -60,8 +61,8 @@ The following arguments are supported:
 * `type` - (Required) Certificate pack configuration type.
   Allowed values: `"custom"`, `"dedicated_custom"`, `"advanced"`.
 * `hosts` - (Required) List of hostnames to provision the certificate pack for.
-  Note: If using Let's Encrypt, you cannot use individual subdomains and only a
-  wildcard for subdomain is available.
+  The zone name must be included as a host. Note: If using Let's Encrypt, you
+  cannot use individual subdomains and only a wildcard for subdomain is available.
 * `validation_method` - (Optional based on `type`) Which validation method to
   use in order to prove domain ownership. Allowed values: `"txt"`, `"http"`, `"email"`.
 * `validity_days` - (Optional based on `type`) How long the certificate is valid
@@ -73,6 +74,8 @@ The following arguments are supported:
 * `cloudflare_branding` - (Optional based on `type`) Whether or not to include
   Cloudflare branding. This will add `sni.cloudflaressl.com` as the Common Name
   if set to `true`.
+* `wait_for_active_status` - (Optional) Whether or not to wait for a certificate
+  pack to reach status `active` during creation. Defaults to `false`.
 
 ## Import
 
