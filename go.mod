@@ -39,6 +39,8 @@ require (
 	golang.org/x/time v0.0.0-20220224211638-0e9765cccd65 // indirect
 )
 
+replace github.com/cloudflare/cloudflare-go v0.39.0 => github.com/shopify/cloudflare-go v0.7.4-0.20220516165915-910a8d21f6d6
+
 require github.com/stretchr/testify v1.7.1
 
 require (
