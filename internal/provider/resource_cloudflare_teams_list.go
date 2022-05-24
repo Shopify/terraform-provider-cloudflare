@@ -70,7 +70,12 @@ func resourceCloudflareTeamsListRead(ctx context.Context, d *schema.ResourceData
 	d.Set("type", list.Type)
 	d.Set("description", list.Description)
 
-	listItems, _, err := client.TeamsListItems(ctx, accountID, d.Id())
+	params := cloudflare.TeamsListItemsParams{
+		AccountID: accountID,
+		ListID:    d.Id(),
+	}
+
+	listItems, _, err := client.TeamsListItems(ctx, params)
 	if err != nil {
 		return diag.FromErr(fmt.Errorf("error finding Teams List %q: %w", d.Id(), err))
 	}

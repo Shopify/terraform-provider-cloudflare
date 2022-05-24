@@ -54,7 +54,7 @@ func expandWaitingRoomEvent(d *schema.ResourceData) (cloudflare.WaitingRoomEvent
 		Name:                  d.Get("name").(string),
 		EventStartTime:        eventStartTime,
 		EventEndTime:          eventEndTime,
-		PrequeueStartTime:     prequeueStartTime,
+		PrequeueStartTime:     cloudflare.TimePtr(prequeueStartTime),
 		Description:           d.Get("description").(string),
 		QueueingMethod:        d.Get("queueing_method").(string),
 		ShuffleAtEventStart:   d.Get("shuffle_at_event_start").(bool),
@@ -109,7 +109,7 @@ func resourceCloudflareWaitingRoomEventRead(ctx context.Context, d *schema.Resou
 	d.Set("event_end_time", waitingRoomEvent.EventEndTime.Format(time.RFC3339))
 	d.Set("session_duration", waitingRoomEvent.SessionDuration)
 
-	if !waitingRoomEvent.PrequeueStartTime.IsZero() {
+	if !cloudflare.Time(waitingRoomEvent.PrequeueStartTime).IsZero() {
 		d.Set("prequeue_start_time", waitingRoomEvent.PrequeueStartTime.Format(time.RFC3339))
 	}
 
