@@ -2,6 +2,8 @@ module github.com/cloudflare/terraform-provider-cloudflare
 
 go 1.17
 
+replace github.com/cloudflare/cloudflare-go => github.com/shopify/cloudflare-go v0.7.4-0.20220625172930-143ef5020fdc
+
 require (
 	github.com/agext/levenshtein v1.2.3 // indirect
 	github.com/apparentlymart/go-cidr v1.1.0 // indirect
