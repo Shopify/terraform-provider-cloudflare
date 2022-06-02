@@ -283,6 +283,8 @@ func New(version string) func() *schema.Provider {
 				"cloudflare_zone_lockdown":                          resourceCloudflareZoneLockdown(),
 				"cloudflare_zone_settings_override":                 resourceCloudflareZoneSettingsOverride(),
 				"cloudflare_zone":                                   resourceCloudflareZone(),
+				/* Non Public below this line*/
+				"cloudflare_zone_cache_tiered_cache_smart_topology": resourceCloudflareZoneCacheTieredCacheSmartTopology(),
 			},
 		}
 
