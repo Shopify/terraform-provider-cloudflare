@@ -128,6 +128,7 @@ ENHANCEMENTS:
 * resource/cloudflare_zone_setting_override: add support for overriding `visitor_ip` ([#1261](https://github.com/cloudflare/terraform-provider-cloudflare/issues/1261))
 * resource/custom_hostname: also adds missing `validation_errors`, and `certificate_authority` ([#1424](https://github.com/cloudflare/terraform-provider-cloudflare/issues/1424))
 * resource/custom_hostname: validation tokens are now an array (`validation_records`) instead of a top level, but the only top level record that was previously here was for cname validation, txt/http/email were entirely missing. ([#1424](https://github.com/cloudflare/terraform-provider-cloudflare/issues/1424))
+* resource/logpush_job: Add `filter` field support ([#1664](https://github.com/cloudflare/terraform-provider-cloudflare/issues/1664))
 * resource/ruleset: add support for `origin` and `host_header` attributes ([#1620](https://github.com/cloudflare/terraform-provider-cloudflare/issues/1620))
 
 BUG FIXES:
