@@ -57,10 +57,6 @@ func resourceCloudflareLogpushJobSchema() map[string]*schema.Schema {
 			Optional:    true,
 			Description: "Use filters to select the events to include and/or remove from your logs. For more information, refer to [Filters](https://developers.cloudflare.com/logs/reference/logpush-api-configuration/filters/).",
 		},
-		"filter": {
-			Type:     schema.TypeString,
-			Optional: true,
-		},
 		"frequency": {
 			Type:         schema.TypeString,
 			Optional:     true,
