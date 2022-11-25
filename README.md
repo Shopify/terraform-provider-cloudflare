@@ -4,7 +4,7 @@
 
 ### Initial setup
 
-Run `dev clone terraform-provider-cloudflare` and place the following snippet in `~/terraformrc`:
+Run `dev clone terraform-provider-cloudflare` and place the following snippet in `~/.terraformrc`:
 ```
 provider_installation {
   dev_overrides {
