@@ -1,4 +1,11 @@
 version: 2
+blobs:
+  - provider: gs
+    bucket: shopify-terraform-private-registry
+    directory: providers/shopify/{{ .ProjectName }}/{{ .Version }}
+    extra_files:
+    - glob: terraform-registry-manifest.json
+      name_template: manifest.json
 builds:
   - env:
       - CGO_ENABLED=0
@@ -17,28 +24,21 @@ builds:
 archives:
   - formats:
       - zip
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    name_template: "{{ .Os }}_{{ .Arch }}"
 checksum:
-  name_template: "{{ .ProjectName }}_{{ .Version }}_SHA256SUMS"
   extra_files:
-    - glob: "terraform-registry-manifest.json"
-      name_template: "{{ .ProjectName }}_{{ .Version }}_manifest.json"
+    - glob: terraform-registry-manifest.json
+      name_template: "manifest.json"
+  name_template: "SHA256SUMS"
   algorithm: sha256
 signs:
   - artifacts: checksum
     args:
       - "--batch"
       - "--local-user"
-      - "{{ .Env.GPG_FINGERPRINT }}" # set this environment variable for your signing key
+      - "{{ .Env.GPG_FINGERPRINT }}"
       - "--output"
       - "${signature}"
       - "--detach-sign"
       - "${artifact}"
 release:
-  extra_files:
-    - glob: "terraform-registry-manifest.json"
-      name_template: "{{ .ProjectName }}_{{ .Version }}_manifest.json"
-changelog:
-  disable: true
-snapshot:
-  version_template: "{{.ShortCommit}}-dev"
