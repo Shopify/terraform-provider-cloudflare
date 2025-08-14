@@ -7,7 +7,7 @@ jobs:
   build:
     permissions:
       pull-requests: write
-    runs-on: shopify-ubuntu-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: Shopify/github-actions/comment-on-pr-action@v1
         env:
