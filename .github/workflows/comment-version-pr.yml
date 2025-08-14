@@ -1,0 +1,15 @@
+name: Pull request opened - comment version reminder
+on:
+  pull_request:
+    types: [opened]
+
+jobs:
+  build:
+    runs-on: shopify-ubuntu-latest
+    steps:
+      - uses: Shopify/github-actions/comment-on-pr-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          msg: "**Reminder:** Please remember to bump the version number in VERSION."
+          check_for_duplicate_msg: false

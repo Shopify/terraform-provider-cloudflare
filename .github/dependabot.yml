@@ -1,17 +1,19 @@
 version: 2
 updates:
-- package-ecosystem: "gomod"
+- package-ecosystem: gomod
+  target-branch: cloudflare-v4
   directory: "/"
   schedule:
-    interval: "daily"
+    interval: weekly
   ignore:
     - dependency-name: "*aws-sdk-go*"
-- package-ecosystem: "github-actions"
+- package-ecosystem: github-actions
+  target-branch: cloudflare-v4
   directory: "/"
   schedule:
-    interval: "daily"
-- package-ecosystem: "docker"
+    interval: weekly
+- package-ecosystem: docker
+  target-branch: cloudflare-v4
   directory: "/"
   schedule:
-    interval: "daily"
-
+    interval: weekly
