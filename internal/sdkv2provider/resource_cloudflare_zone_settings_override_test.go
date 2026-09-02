@@ -15,6 +15,22 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
+func TestCloudflareZoneSettingsOverrideOriginH2MaxStreamsSchema(t *testing.T) {
+	setting, ok := resourceCloudflareZoneSettingsSchema["origin_h2_max_streams"]
+	require.True(t, ok)
+	require.NotNil(t, setting.ValidateFunc)
+	require.Contains(t, fetchAsSingleSetting, "origin_h2_max_streams")
+
+	for _, value := range []int{1, 100, 1000} {
+		_, errs := setting.ValidateFunc(value, "origin_h2_max_streams")
+		require.Empty(t, errs)
+	}
+	for _, value := range []int{0, 1001} {
+		_, errs := setting.ValidateFunc(value, "origin_h2_max_streams")
+		require.NotEmpty(t, errs)
+	}
+}
+
 func TestAccCloudflareZoneSettingsOverride_Full(t *testing.T) {
 	zoneID := os.Getenv("CLOUDFLARE_ZONE_ID")
 	rnd := generateRandomResourceName()
