@@ -61,6 +61,13 @@ func resourceCloudflareZoneSettingsOverrideSchema() map[string]*schema.Schema {
 }
 
 var resourceCloudflareZoneSettingsSchema = map[string]*schema.Schema{
+	"origin_h2_max_streams": {
+		Type:         schema.TypeInt,
+		Optional:     true,
+		Computed:     true,
+		ValidateFunc: validation.IntBetween(1, 1000),
+	},
+
 	"always_online": {
 		Type:         schema.TypeString,
 		ValidateFunc: validation.StringInSlice([]string{"on", "off"}, false),

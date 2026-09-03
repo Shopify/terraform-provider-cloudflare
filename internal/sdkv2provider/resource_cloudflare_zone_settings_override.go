@@ -46,6 +46,7 @@ var fetchAsSingleSetting = []string{
 	"h2_prioritization",
 	"image_resizing",
 	"early_hints",
+	"origin_h2_max_streams",
 	"origin_max_http_version",
 	"fonts",
 	"nel",
