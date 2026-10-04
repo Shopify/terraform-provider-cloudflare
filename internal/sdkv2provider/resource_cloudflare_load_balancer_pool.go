@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"net/http"
 	"strings"
 
 	"time"
@@ -100,53 +101,58 @@ func resourceCloudflareLoadBalancerPoolCreate(ctx context.Context, d *schema.Res
 func resourceCloudflareLoadBalancerPoolUpdate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	client := meta.(*cloudflare.API)
 
-	loadBalancerPool := cloudflare.LoadBalancerPool{
-		ID:             d.Id(),
-		Name:           d.Get("name").(string),
-		Origins:        expandLoadBalancerOrigins(d.Get("origins").(*schema.Set)),
-		Enabled:        d.Get("enabled").(bool),
-		MinimumOrigins: cloudflare.IntPtr(d.Get("minimum_origins").(int)),
+	// PATCH only the planned changes. In particular, ignored origins may be
+	// managed outside Terraform and contain fields the SDK cannot represent.
+	updates := make(map[string]interface{})
+	for _, key := range []string{"name", "enabled", "minimum_origins", "description", "monitor", "notification_email"} {
+		if d.HasChange(key) {
+			updates[key] = d.Get(key)
+		}
 	}
 
-	if lat, ok := d.GetOk("latitude"); ok {
-		f := float32(lat.(float64))
-		loadBalancerPool.Latitude = &f
-	}
-	if long, ok := d.GetOk("longitude"); ok {
-		f := float32(long.(float64))
-		loadBalancerPool.Longitude = &f
+	// The API requires both coordinates when either one is supplied.
+	if d.HasChange("latitude") || d.HasChange("longitude") {
+		updates["latitude"] = d.Get("latitude")
+		updates["longitude"] = d.Get("longitude")
 	}
 
-	if checkRegions, ok := d.GetOk("check_regions"); ok {
-		loadBalancerPool.CheckRegions = expandInterfaceToStringList(checkRegions.(*schema.Set).List())
+	if d.HasChange("origins") {
+		updates["origins"] = expandLoadBalancerOrigins(d.Get("origins").(*schema.Set))
+	}
+	if d.HasChange("check_regions") {
+		updates["check_regions"] = expandInterfaceToStringList(d.Get("check_regions").(*schema.Set).List())
 	}
 
-	if description, ok := d.GetOk("description"); ok {
-		loadBalancerPool.Description = description.(string)
+	if d.HasChange("load_shedding") {
+		updates["load_shedding"] = nil
+		if shed := expandLoadBalancerLoadShedding(d.Get("load_shedding").(*schema.Set)); shed != nil {
+			// Keep explicit zero percentages when resetting settings; the SDK
+			// struct omits them when marshalled. Empty policies are not valid.
+			loadShedding := map[string]interface{}{
+				"default_percent": shed.DefaultPercent,
+				"session_percent": shed.SessionPercent,
+			}
+			if shed.DefaultPolicy != "" {
+				loadShedding["default_policy"] = shed.DefaultPolicy
+			}
+			if shed.SessionPolicy != "" {
+				loadShedding["session_policy"] = shed.SessionPolicy
+			}
+			updates["load_shedding"] = loadShedding
+		}
+	}
+	if d.HasChange("origin_steering") {
+		updates["origin_steering"] = expandLoadBalancerOriginSteering(d.Get("origin_steering").(*schema.Set))
 	}
 
-	if monitor, ok := d.GetOk("monitor"); ok {
-		loadBalancerPool.Monitor = monitor.(string)
-	}
+	tflog.Debug(ctx, fmt.Sprintf("Updating Cloudflare Load Balancer Pool fields: %+v", updates))
 
-	if shed, ok := d.GetOk("load_shedding"); ok {
-		loadBalancerPool.LoadShedding = expandLoadBalancerLoadShedding(shed.(*schema.Set))
-	}
-
-	if steering, ok := d.GetOk("origin_steering"); ok {
-		loadBalancerPool.OriginSteering = expandLoadBalancerOriginSteering(steering.(*schema.Set))
-	}
-
-	if notificationEmail, ok := d.GetOk("notification_email"); ok {
-		loadBalancerPool.NotificationEmail = notificationEmail.(string)
-	}
-
-	tflog.Debug(ctx, fmt.Sprintf("Updating Cloudflare Load Balancer Pool from struct: %+v", loadBalancerPool))
-
-	accountID := d.Get(consts.AccountIDSchemaKey).(string)
-	_, err := client.UpdateLoadBalancerPool(ctx, cloudflare.AccountIdentifier(accountID), cloudflare.UpdateLoadBalancerPoolParams{LoadBalancer: loadBalancerPool})
-	if err != nil {
-		return diag.FromErr(errors.Wrap(err, "error updating load balancer pool"))
+	if len(updates) > 0 {
+		accountID := d.Get(consts.AccountIDSchemaKey).(string)
+		endpoint := fmt.Sprintf("/accounts/%s/load_balancers/pools/%s", accountID, d.Id())
+		if _, err := client.Raw(ctx, http.MethodPatch, endpoint, updates, nil); err != nil {
+			return diag.FromErr(errors.Wrap(err, "error updating load balancer pool"))
+		}
 	}
 
 	return resourceCloudflareLoadBalancerPoolRead(ctx, d, meta)
