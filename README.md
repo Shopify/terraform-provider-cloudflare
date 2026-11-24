@@ -1,5 +1,3 @@
-> **This repository is no longer maintained.** It has been archived and receives no updates or security fixes.
-
 # Cloudflare Terraform Provider
 
 The [Cloudflare Terraform provider](https://registry.terraform.io/providers/cloudflare/cloudflare/latest/docs) provides convenient access to
